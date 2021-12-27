@@ -34,9 +34,8 @@ wb = Workbook()
 #wb = wb.add_sheet("Sheet 1", cell_overwrite_ok=True) #Permitir pisar celdas
 #sheet3._cell_overwrite_ok = True/False permite modificar en el momento
 
-for tn in data["polUni"]["children"]:           #Lista de dicts
+for tn in data["polUni"]["children"]:           #Tenant Policies
     if "fvTenant" in tn and tn["fvTenant"]["attributes"]["name"]!= "common" and tn["fvTenant"]["attributes"]["name"]!= "infra":
-        #print(tn)
         print("tn: {}".format(tn["fvTenant"]["attributes"]["name"]))
         sheet = wb.add_sheet(tn["fvTenant"]["attributes"]["name"])
         row = 0
@@ -52,27 +51,20 @@ for tn in data["polUni"]["children"]:           #Lista de dicts
         sheet.write(row, 9, "Encap")
         for ap in tn["fvTenant"]["children"]:                                                           #Lista de dicts Tenants
             if "fvAp" in ap:
-                #print(ap)
                 print(" ap: {}".format(ap["fvAp"]["attributes"]["name"]))
                 row += 1
                 sheet.write(row, 0, ap["fvAp"]["attributes"]["name"])                    
                 for epg in ap["fvAp"]["children"]:                                                      #Lista de dicts AP
                     if "fvAEPg" in epg:
-                        #print(epg)
                         print("     epg: {}".format(epg["fvAEPg"]["attributes"]["name"]))
-                        #sheet.write(row, 1, epg["fvAEPg"]["attributes"]["name"])
                         row = write_cell(sheet, row, 1, epg["fvAEPg"]["attributes"]["name"])
                         rows = [row] * 8
                         for e in epg["fvAEPg"]["children"]:                                            #Lista de dicts EPGs
                             if "fvRsBd" in e:
-                                #print(e)
                                 print("     bd: {}".format(e["fvRsBd"]["attributes"]["tnFvBDName"]))
-                                #sheet.write(row, 2, e["fvRsBd"]["attributes"]["tnFvBDName"])
                                 rows[0] = write_cell(sheet, rows[0], 2, e["fvRsBd"]["attributes"]["tnFvBDName"])
                                 for bd in tn["fvTenant"]["children"]:
                                     if "fvBD" in bd and bd["fvBD"]["attributes"]["name"]==e["fvRsBd"]["attributes"]["tnFvBDName"]:
-                                        #print(bd)
-                                        #print("     fvBD: {}".format(bd["fvBD"]["attributes"]["name"]))
                                         for subnet in bd["fvBD"]["children"]: 
                                             if "fvSubnet" in subnet:   
                                                 rows[1] = write_cell(sheet, rows[1], 3, subnet["fvSubnet"]["attributes"]["ip"])
@@ -118,7 +110,7 @@ for tn in data["polUni"]["children"]:           #Lista de dicts
                 rows = [row] * 10
                 for l3 in l3out["l3extOut"]["children"]:
                     if "ospfExtP" in l3:
-                        write_cell(sheet, row, 15, "OSPF")
+                        write_cell(sheet, row, 15, "OSPF")          #TODO incorporar los otros portocolos de ruteo
                     if "l3extRsL3DomAtt" in l3:
                         rows[0] = write_cell(sheet, rows[0], 14, l3["l3extRsL3DomAtt"]["attributes"]["tDn"][4:])
                     if "l3extRsEctx" in l3:
@@ -129,9 +121,9 @@ for tn in data["polUni"]["children"]:           #Lista de dicts
                             if "l3extSubnet" in extepg:
                                 rows[2] = write_cell(sheet, rows[2], 3, extepg["l3extSubnet"]["attributes"]["ip"]) #TODO: Agregar Scopes
                             if "fvRsCons" in extepg:
-                                rows[3] = write_cell(sheet, rows[3], 4, extepg["fvRsCons"]["attributes"]["tnVzBrCPName"])
+                                rows[3] = write_cell(sheet, rows[3], 5, extepg["fvRsCons"]["attributes"]["tnVzBrCPName"])
                             if "fvRsProv" in extepg:
-                                rows[4] = write_cell(sheet, rows[4], 5, extepg["fvRsProv"]["attributes"]["tnVzBrCPName"])
+                                rows[4] = write_cell(sheet, rows[4], 4, extepg["fvRsProv"]["attributes"]["tnVzBrCPName"])
                     if "l3extLNodeP" in l3:
                         rows[5] = write_cell(sheet, rows[5], 6, l3["l3extLNodeP"]["attributes"]["name"])
                         for nodel3 in l3["l3extLNodeP"]["children"]:
@@ -148,6 +140,46 @@ for tn in data["polUni"]["children"]:           #Lista de dicts
                                             if "l3extMember" in l3ip:
                                                 rows[9] = write_cell(sheet, rows[9], 11, l3ip["l3extMember"]["attributes"]["addr"])
                 row = max(rows)+1
+
+#Access Policies
+#Domain, AAEP y VLAN Pool
+sheet = wb.add_sheet("Access_Policies")
+row = 0
+sheet.write(row, 0, "Domain")
+sheet.write(row, 1, "Dom Type")
+sheet.write(row, 2, "AAEP")
+sheet.write(row, 3, "VLAN Pool")
+sheet.write(row, 4, "Pool Type")
+sheet.write(row, 5, "Range")
+sheet.write(row, 6, "Description")
+row += 1    
+for dom in data["polUni"]["children"]: 
+    if "physDomP" in dom:
+        row = write_cell(sheet, row, 0, dom["physDomP"]["attributes"]["name"])
+        write_cell(sheet, row, 1, "phys")
+        rows = [row] * 3   
+        try:
+            for d in dom["physDomP"]["children"]:
+                for ac in data["polUni"]["children"]:
+                    if "infraInfra" in ac:
+                        for vlan in ac["infraInfra"]["children"]:
+                            if "fvnsVlanInstP" in vlan:
+                                if vlan["fvnsVlanInstP"]["attributes"]["name"] == d["infraRsVlanNs"]["attributes"]["tDn"][18:-8]:
+                                    rows[0] = write_cell(sheet, rows[0], 3, vlan["fvnsVlanInstP"]["attributes"]["name"]) 
+                                    for v in vlan["fvnsVlanInstP"]["children"]:
+                                        if "fvnsEncapBlk" in v:
+                                            rows[1] = write_cell(sheet, rows[1], 4, v["fvnsEncapBlk"]["attributes"]["allocMode"])
+                                            if v["fvnsEncapBlk"]["attributes"]["from"] == v["fvnsEncapBlk"]["attributes"]["to"]:
+                                                write_cell(sheet, rows[1], 5, v["fvnsEncapBlk"]["attributes"]["from"][5:])
+                                            else:
+                                                write_cell(sheet, rows[1], 5, v["fvnsEncapBlk"]["attributes"]["from"][5:]+v["fvnsEncapBlk"]["attributes"]["to"][4:])
+        except Exception as e:
+            if "physDomP" in str(e):
+                rows[0] = write_cell(sheet, rows[0], 3, "NA")
+            if "children" in str(e): 
+                rows[1] = write_cell(sheet, rows[1], 4, "NA")
+        row = max(rows)+1
+
 
 
 #Save to file
