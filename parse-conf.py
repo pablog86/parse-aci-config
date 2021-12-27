@@ -6,6 +6,7 @@ import re
 import tkinter as tk
 from tkinter import filedialog
 
+#Escritora de celdas sin pisar
 def write_cell (sheet, row, col, str):
     try:
        sheet.write(row, col, str)
@@ -13,6 +14,42 @@ def write_cell (sheet, row, col, str):
        row += 1
        sheet.write(row, col, str)
     return row
+
+#Mapeo de dominio a vlan y AAEP
+def dom2vlan_aaep (dom, dom_type, row):     #TODO: agregarm as dominios a phys y l3out
+    rows = [row] * 3 
+    try:                                            
+        for d in dom[dom_type]["children"]:       
+            for ac in data["polUni"]["children"]:
+                if "infraInfra" in ac:
+                    for vlan in ac["infraInfra"]["children"]:       #Mapeo de dominio fisico a vlan
+                        if "fvnsVlanInstP" in vlan:
+                            if vlan["fvnsVlanInstP"]["attributes"]["name"] == d["infraRsVlanNs"]["attributes"]["tDn"][18:-8]:
+                                rows[0] = write_cell(sheet, rows[0], 3, vlan["fvnsVlanInstP"]["attributes"]["name"]) 
+                                for v in vlan["fvnsVlanInstP"]["children"]:
+                                    if "fvnsEncapBlk" in v:
+                                        rows[1] = write_cell(sheet, rows[1], 4, v["fvnsEncapBlk"]["attributes"]["allocMode"])
+                                        if v["fvnsEncapBlk"]["attributes"]["from"] == v["fvnsEncapBlk"]["attributes"]["to"]:
+                                            write_cell(sheet, rows[1], 5, v["fvnsEncapBlk"]["attributes"]["from"][5:])
+                                        else:
+                                            write_cell(sheet, rows[1], 5, v["fvnsEncapBlk"]["attributes"]["from"][5:]+v["fvnsEncapBlk"]["attributes"]["to"][4:])
+                    for aep in ac["infraInfra"]["children"]:
+                        if "infraAttEntityP" in aep:                #Mapeo de dominio fisico a AAEP
+                            for a in aep["infraAttEntityP"]["children"]:
+                                if dom_type == "physDomP":
+                                    if dom[dom_type]["attributes"]["name"] == a["infraRsDomP"]["attributes"]["tDn"][9:]:
+                                        rows[2] = write_cell(sheet, rows[2], 2, aep["infraAttEntityP"]["attributes"]["name"]) 
+                                if dom_type == "l3extDomP":
+                                    if dom[dom_type]["attributes"]["name"] == a["infraRsDomP"]["attributes"]["tDn"][10:]:
+                                        rows[2] = write_cell(sheet, rows[2], 2, aep["infraAttEntityP"]["attributes"]["name"]) 
+    except Exception as e:
+        if "physDomP" in str(e):
+            rows[0] = write_cell(sheet, rows[0], 3, "NA")
+        if "children" in str(e): 
+            rows[1] = write_cell(sheet, rows[1], 4, "NA")
+    row = max(rows)+1
+    return row
+###
 
 root = tk.Tk()
 root.withdraw()
@@ -36,7 +73,7 @@ wb = Workbook()
 
 for tn in data["polUni"]["children"]:           #Tenant Policies
     if "fvTenant" in tn and tn["fvTenant"]["attributes"]["name"]!= "common" and tn["fvTenant"]["attributes"]["name"]!= "infra":
-        print("tn: {}".format(tn["fvTenant"]["attributes"]["name"]))
+        #print("tn: {}".format(tn["fvTenant"]["attributes"]["name"]))
         sheet = wb.add_sheet(tn["fvTenant"]["attributes"]["name"])
         row = 0
         sheet.write(row, 0, "App Profile")
@@ -51,17 +88,17 @@ for tn in data["polUni"]["children"]:           #Tenant Policies
         sheet.write(row, 9, "Encap")
         for ap in tn["fvTenant"]["children"]:                                                           #Lista de dicts Tenants
             if "fvAp" in ap:
-                print(" ap: {}".format(ap["fvAp"]["attributes"]["name"]))
+                #print(" ap: {}".format(ap["fvAp"]["attributes"]["name"]))
                 row += 1
                 sheet.write(row, 0, ap["fvAp"]["attributes"]["name"])                    
                 for epg in ap["fvAp"]["children"]:                                                      #Lista de dicts AP
                     if "fvAEPg" in epg:
-                        print("     epg: {}".format(epg["fvAEPg"]["attributes"]["name"]))
+                        #print("     epg: {}".format(epg["fvAEPg"]["attributes"]["name"]))
                         row = write_cell(sheet, row, 1, epg["fvAEPg"]["attributes"]["name"])
                         rows = [row] * 8
                         for e in epg["fvAEPg"]["children"]:                                            #Lista de dicts EPGs
                             if "fvRsBd" in e:
-                                print("     bd: {}".format(e["fvRsBd"]["attributes"]["tnFvBDName"]))
+                                #print("     bd: {}".format(e["fvRsBd"]["attributes"]["tnFvBDName"]))
                                 rows[0] = write_cell(sheet, rows[0], 2, e["fvRsBd"]["attributes"]["tnFvBDName"])
                                 for bd in tn["fvTenant"]["children"]:
                                     if "fvBD" in bd and bd["fvBD"]["attributes"]["name"]==e["fvRsBd"]["attributes"]["tnFvBDName"]:
@@ -71,17 +108,17 @@ for tn in data["polUni"]["children"]:           #Tenant Policies
                                             if "fvRsCtx" in subnet:
                                                 rows[2] = write_cell(sheet, rows[2], 4, subnet["fvRsCtx"]["attributes"]["tnFvCtxName"])
                             if "fvRsDomAtt" in e:
-                                print("     Dominio: {}".format(e["fvRsDomAtt"]["attributes"]["tDn"]))
+                                #print("     Dominio: {}".format(e["fvRsDomAtt"]["attributes"]["tDn"]))
                                 rows[3] = write_cell(sheet, rows[3], 7, e["fvRsDomAtt"]["attributes"]["tDn"][4:])  #TODO Considerar todos los tipos de domino
                             if "fvRsPathAtt" in e:
-                                print("     Association: {} | {}".format(e["fvRsPathAtt"]["attributes"]["tDn"],e["fvRsPathAtt"]["attributes"]["encap"]))
+                                #print("     Association: {} | {}".format(e["fvRsPathAtt"]["attributes"]["tDn"],e["fvRsPathAtt"]["attributes"]["encap"]))
                                 rows[4] = write_cell(sheet, rows[4], 8, e["fvRsPathAtt"]["attributes"]["tDn"][e["fvRsPathAtt"]["attributes"]["tDn"].find("[")+1:-1])
                                 write_cell(sheet, rows[5], 9, e["fvRsPathAtt"]["attributes"]["encap"])
                             if "fvRsProv" in e:
-                                print("     Provide: {}".format(e["fvRsProv"]["attributes"]["tnVzBrCPName"])) 
+                                #print("     Provide: {}".format(e["fvRsProv"]["attributes"]["tnVzBrCPName"])) 
                                 rows[6] = write_cell(sheet, rows[6], 6, e["fvRsProv"]["attributes"]["tnVzBrCPName"])   
                             if "fvRsCons" in e:
-                                print("     Consume: {}".format(e["fvRsCons"]["attributes"]["tnVzBrCPName"])) 
+                                #print("     Consume: {}".format(e["fvRsCons"]["attributes"]["tnVzBrCPName"])) 
                                 rows[7] = write_cell(sheet, rows[7], 5, e["fvRsCons"]["attributes"]["tnVzBrCPName"])   
                         row = max(rows)+1
         for l3out in tn["fvTenant"]["children"]:                            #L3outs por Tenant 
@@ -156,36 +193,137 @@ row += 1
 for dom in data["polUni"]["children"]: 
     if "physDomP" in dom:
         row = write_cell(sheet, row, 0, dom["physDomP"]["attributes"]["name"])
-        write_cell(sheet, row, 1, "phys")
-        rows = [row] * 3   
-        try:                                            
-            for d in dom["physDomP"]["children"]:       
-                for ac in data["polUni"]["children"]:
-                    if "infraInfra" in ac:
-                        for vlan in ac["infraInfra"]["children"]:       #Mapeo de vlan a Dominio fisico
-                            if "fvnsVlanInstP" in vlan:
-                                if vlan["fvnsVlanInstP"]["attributes"]["name"] == d["infraRsVlanNs"]["attributes"]["tDn"][18:-8]:
-                                    rows[0] = write_cell(sheet, rows[0], 3, vlan["fvnsVlanInstP"]["attributes"]["name"]) 
-                                    for v in vlan["fvnsVlanInstP"]["children"]:
-                                        if "fvnsEncapBlk" in v:
-                                            rows[1] = write_cell(sheet, rows[1], 4, v["fvnsEncapBlk"]["attributes"]["allocMode"])
-                                            if v["fvnsEncapBlk"]["attributes"]["from"] == v["fvnsEncapBlk"]["attributes"]["to"]:
-                                                write_cell(sheet, rows[1], 5, v["fvnsEncapBlk"]["attributes"]["from"][5:])
-                                            else:
-                                                write_cell(sheet, rows[1], 5, v["fvnsEncapBlk"]["attributes"]["from"][5:]+v["fvnsEncapBlk"]["attributes"]["to"][4:])
-                            if "infraAttEntityP" in vlan:
-                                for aep in vlan["infraAttEntityP"]["children"]:
-                                    if dom["physDomP"]["attributes"]["name"] == aep["infraRsDomP"]["attributes"]["tDn"][9:]:
-                                       rows[2] = write_cell(sheet, rows[2], 2, vlan["infraAttEntityP"]["attributes"]["name"]) 
-        except Exception as e:
-            if "physDomP" in str(e):
-                rows[0] = write_cell(sheet, rows[0], 3, "NA")
-            if "children" in str(e): 
-                rows[1] = write_cell(sheet, rows[1], 4, "NA")
-        row = max(rows)+1
+        write_cell(sheet, row, 1, "phys") 
+        row = dom2vlan_aaep (dom, "physDomP", row) 
+    if "l3extDomP" in dom:
+        row = write_cell(sheet, row, 0, dom["l3extDomP"]["attributes"]["name"])
+        write_cell(sheet, row, 1, "l3out")
+        row = dom2vlan_aaep (dom, "l3extDomP", row) 
+#Switch profiles
+row += 1   
+sheet.write(row, 0, "Switch Prof")
+sheet.write(row, 1, "Description")
+sheet.write(row, 2, "Leaf sel")
+sheet.write(row, 3, "Node block")
+sheet.write(row, 4, "Int Prof")
+sheet.write(row, 5, "Int Sel")
+sheet.write(row, 6, "Int Sel desc")
+sheet.write(row, 7, "Policy group")
+sheet.write(row, 8, "Interfaces")
+row += 1
+for d in data["polUni"]["children"]:
+    if "infraInfra" in d:
+        for sw in d["infraInfra"]["children"]:
+            if "infraNodeP" in sw:
+                write_cell(sheet, row, 0, sw["infraNodeP"]["attributes"]["name"])
+                write_cell(sheet, row, 1, sw["infraNodeP"]["attributes"]["descr"])
+                rows = [row] * 6
+                for intf in sw["infraNodeP"]["children"]:
+                    if "infraLeafS" in intf:
+                        rows[1] = write_cell(sheet, rows[1], 2, intf["infraLeafS"]["attributes"]["name"])
+                        for n in intf["infraLeafS"]["children"]:
+                            if "infraNodeBlk" in n:
+                                if n["infraNodeBlk"]["attributes"]["from_"] == n["infraNodeBlk"]["attributes"]["to_"]:
+                                    rows[2] = write_cell(sheet, rows[2], 3, n["infraNodeBlk"]["attributes"]["from_"])
+                                else:
+                                    rows[2] = write_cell(sheet, rows[2], 3, n["infraNodeBlk"]["attributes"]["from_"]+"-"+n["infraNodeBlk"]["attributes"]["to_"])
+                    if "infraRsAccPortP" in intf:
+                        rows[0] = write_cell(sheet, rows[0], 4, intf["infraRsAccPortP"]["attributes"]["tDn"][intf["infraRsAccPortP"]["attributes"]["tDn"].find("-")+1:])
+                        for intprof in d["infraInfra"]["children"]:  
+                            if "infraAccPortP" in intprof:
+                                if intprof["infraAccPortP"]["attributes"]["name"] == intf["infraRsAccPortP"]["attributes"]["tDn"][intf["infraRsAccPortP"]["attributes"]["tDn"].find("-")+1:]:
+                                    for ints in intprof["infraAccPortP"]["children"]:
+                                        if "infraHPortS" in ints:
+                                            rows[3] = write_cell(sheet, rows[3], 5, ints["infraHPortS"]["attributes"]["name"])
+                                            write_cell(sheet, rows[3], 6, ints["infraHPortS"]["attributes"]["descr"])
+                                        for i in ints["infraHPortS"]["children"]:
+                                            if "infraRsAccBaseGrp" in i:
+                                                rows[4] = write_cell(sheet, rows[4], 7, i["infraRsAccBaseGrp"]["attributes"]["tDn"][i["infraRsAccBaseGrp"]["attributes"]["tDn"].find("-")+1:])
+                                            if "infraPortBlk" in i:
+                                                fport = i["infraPortBlk"]["attributes"]["fromCard"]+"/"+i["infraPortBlk"]["attributes"]["fromPort"]
+                                                tport = i["infraPortBlk"]["attributes"]["toCard"]+"/"+i["infraPortBlk"]["attributes"]["toPort"]
+                                                if fport == tport:
+                                                    rows[5] = write_cell(sheet, rows[5], 8, fport)
+                                                else:
+                                                    rows[5] = write_cell(sheet, rows[5], 8, fport+"-"+tport)
+                row = max(rows)+1
 
+#Policy groups
+row += 1   
+sheet.write(row, 0, "Policy Group")
+sheet.write(row, 1, "Description")
+sheet.write(row, 2, "AAEP")
+sheet.write(row, 3, "CDP")
+sheet.write(row, 4, "LLDP")
+sheet.write(row, 5, "LACP")
+sheet.write(row, 6, "Speed")
+sheet.write(row, 7, "MCP")
+row += 1
+for d in data["polUni"]["children"]:
+    if "infraInfra" in d:
+        for funcp in d["infraInfra"]["children"]:
+            if "infraFuncP" in funcp:
+                rows = [row] * 1
+                for pg in funcp["infraFuncP"]["children"]:
+                    if "infraAccBndlPolGrp" in pg:
+                        rows[0] = write_cell(sheet, rows[0], 0, pg["infraAccBndlPolGrp"]["attributes"]["name"])
+                        write_cell(sheet, rows[0], 1, pg["infraAccBndlPolGrp"]["attributes"]["descr"])
+                        for p in pg ["infraAccBndlPolGrp"]["children"]:
+                            if "infraRsAttEntP" in p and len(p["infraRsAttEntP"]["attributes"]["tDn"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 2, p["infraRsAttEntP"]["attributes"]["tDn"][p["infraRsAttEntP"]["attributes"]["tDn"].find("-")+1:])    
+                            if "infraRsCdpIfPol" in p and len(p["infraRsCdpIfPol"]["attributes"]["tnCdpIfPolName"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 3, p["infraRsCdpIfPol"]["attributes"]["tnCdpIfPolName"])    
+                            if "infraRsLldpIfPol" in p and len(p["infraRsLldpIfPol"]["attributes"]["tnLldpIfPolName"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 4, p["infraRsLldpIfPol"]["attributes"]["tnLldpIfPolName"])
+                            if "infraRsLacpPol" in p and len(p["infraRsLacpPol"]["attributes"]["tnLacpLagPolName"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 5, p["infraRsLacpPol"]["attributes"]["tnLacpLagPolName"])
+                            if "infraRsHIfPol" in p and len(p["infraRsHIfPol"]["attributes"]["tnFabricHIfPolName"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 6, p["infraRsHIfPol"]["attributes"]["tnFabricHIfPolName"])
+                            if "infraRsMcpIfPol" in p and len(p["infraRsMcpIfPol"]["attributes"]["tnMcpIfPolName"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 6, p["infraRsMcpIfPol"]["attributes"]["tnMcpIfPolName"])
+                    if "infraAccBndlGrp" in pg and pg["infraAccBndlGrp"]["attributes"]["lagT"]=="node":
+                        rows[0] = write_cell(sheet, rows[0], 0, pg["infraAccBndlGrp"]["attributes"]["name"])
+                        write_cell(sheet, rows[0], 1, pg["infraAccBndlGrp"]["attributes"]["descr"])
+                        for p in pg ["infraAccBndlGrp"]["children"]:
+                            if "infraRsAttEntP" in p and len(p["infraRsAttEntP"]["attributes"]["tDn"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 2, p["infraRsAttEntP"]["attributes"]["tDn"][p["infraRsAttEntP"]["attributes"]["tDn"].find("-")+1:])    
+                            if "infraRsCdpIfPol" in p and len(p["infraRsCdpIfPol"]["attributes"]["tnCdpIfPolName"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 3, p["infraRsCdpIfPol"]["attributes"]["tnCdpIfPolName"])    
+                            if "infraRsLldpIfPol" in p and len(p["infraRsLldpIfPol"]["attributes"]["tnLldpIfPolName"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 4, p["infraRsLldpIfPol"]["attributes"]["tnLldpIfPolName"])
+                            if "infraRsLacpPol" in p and len(p["infraRsLacpPol"]["attributes"]["tnLacpLagPolName"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 5, p["infraRsLacpPol"]["attributes"]["tnLacpLagPolName"])
+                            if "infraRsHIfPol" in p and len(p["infraRsHIfPol"]["attributes"]["tnFabricHIfPolName"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 6, p["infraRsHIfPol"]["attributes"]["tnFabricHIfPolName"])
+                            if "infraRsMcpIfPol" in p and len(p["infraRsMcpIfPol"]["attributes"]["tnMcpIfPolName"])>0:
+                                rows[0] = write_cell(sheet, rows[0], 6, p["infraRsMcpIfPol"]["attributes"]["tnMcpIfPolName"])
 
+                row = max(rows)+1   
 
+#Dominio VPC
+row += 1   
+sheet.write(row, 0, "VPC group name")
+sheet.write(row, 1, "Pod")
+sheet.write(row, 2, "Nodo 1")
+sheet.write(row, 3, "Nodo 2")
+row += 1
+n = 0
+for d in data["polUni"]["children"]:
+    if "fabricInst" in d:
+        for vpc in d["fabricInst"]["children"]:
+            if "fabricProtPol" in vpc:
+                for nv in vpc["fabricProtPol"]["children"]:
+                    if "fabricExplicitGEp" in nv:
+                        row = write_cell(sheet, row, 0, nv["fabricExplicitGEp"]["attributes"]["name"])
+                        for v in nv["fabricExplicitGEp"]["children"]:
+                            if "fabricNodePEp" in v: 
+                                if n == 0:
+                                    row = write_cell(sheet, row, 1, v["fabricNodePEp"]["attributes"]["podId"])
+                                    row = write_cell(sheet, row, 2, v["fabricNodePEp"]["attributes"]["id"])
+                                    n = 1
+                                else:
+                                    row = write_cell(sheet, row, 3, v["fabricNodePEp"]["attributes"]["id"])
+                        row += 1
 #Save to file
 wbname = path.split("/")[-1] + ".xls"
 print("The file was generated:  {}".format(wbname))
