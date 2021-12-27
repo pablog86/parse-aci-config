@@ -158,11 +158,11 @@ for dom in data["polUni"]["children"]:
         row = write_cell(sheet, row, 0, dom["physDomP"]["attributes"]["name"])
         write_cell(sheet, row, 1, "phys")
         rows = [row] * 3   
-        try:
-            for d in dom["physDomP"]["children"]:
+        try:                                            
+            for d in dom["physDomP"]["children"]:       
                 for ac in data["polUni"]["children"]:
                     if "infraInfra" in ac:
-                        for vlan in ac["infraInfra"]["children"]:
+                        for vlan in ac["infraInfra"]["children"]:       #Mapeo de vlan a Dominio fisico
                             if "fvnsVlanInstP" in vlan:
                                 if vlan["fvnsVlanInstP"]["attributes"]["name"] == d["infraRsVlanNs"]["attributes"]["tDn"][18:-8]:
                                     rows[0] = write_cell(sheet, rows[0], 3, vlan["fvnsVlanInstP"]["attributes"]["name"]) 
@@ -173,6 +173,10 @@ for dom in data["polUni"]["children"]:
                                                 write_cell(sheet, rows[1], 5, v["fvnsEncapBlk"]["attributes"]["from"][5:])
                                             else:
                                                 write_cell(sheet, rows[1], 5, v["fvnsEncapBlk"]["attributes"]["from"][5:]+v["fvnsEncapBlk"]["attributes"]["to"][4:])
+                            if "infraAttEntityP" in vlan:
+                                for aep in vlan["infraAttEntityP"]["children"]:
+                                    if dom["physDomP"]["attributes"]["name"] == aep["infraRsDomP"]["attributes"]["tDn"][9:]:
+                                       rows[2] = write_cell(sheet, rows[2], 2, vlan["infraAttEntityP"]["attributes"]["name"]) 
         except Exception as e:
             if "physDomP" in str(e):
                 rows[0] = write_cell(sheet, rows[0], 3, "NA")
