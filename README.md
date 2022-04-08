@@ -1,4 +1,44 @@
-# parse-aci-config
+# Parse ACI Config :white_check_mark:
 
-Simple script to convert basic config info from ACI json backup file into excel tables.
+## Description
 
+This example script generates an Excel file with the information gathered from ACI backup in JSON format.
+
+The file contains the following pages:
+- Tenants policies
+- Access Policies
+
+
+## Requirements
+
+Backup file in JSON format.
+
+### Clone the repository
+
+```text
+git clone https://github.com/pablog86/parse-aci-config/
+cd parse_nxos_config
+
+chmod 755 parse_nxos_config
+```
+
+### Python environment
+
+Create virtual environment and activate it (optional)
+
+```text
+python3 -m venv parse_nxos_config
+source parse_nxos_config/bin/activate
+Install required modules
+```
+
+Install required modules
+
+```text
+pip install -r requirements.txt
+```
+
+
+## Usage & examples
+
+Just run the parse-conf.py script and select the backup file. The output will be generated in the same directory.
