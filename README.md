@@ -17,9 +17,9 @@ Backup file in JSON format.
 
 ```text
 git clone https://github.com/pablog86/parse-aci-config/
-cd parse_nxos_config
+cd parse_aci_config
 
-chmod 755 parse_nxos_config
+chmod 755 parse_aci_config
 ```
 
 ### Python environment
@@ -27,8 +27,8 @@ chmod 755 parse_nxos_config
 Create virtual environment and activate it (optional)
 
 ```text
-python3 -m venv parse_nxos_config
-source parse_nxos_config/bin/activate
+python3 -m venv parse_aci_config
+source parse_aci_config/bin/activate
 Install required modules
 ```
 
